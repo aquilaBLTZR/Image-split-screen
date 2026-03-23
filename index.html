@@ -8,23 +8,35 @@
   body {
     margin: 0;
     font-family: Arial, sans-serif;
-    background: #f5f5f5;
+    background-size: cover;
+    background-position: center;
+  }
+
+  #topBar {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: #222;
+    color: white;
   }
 
   #dropZone {
     border: 2px dashed #666;
-    padding: 20px;
+    padding: 15px;
     text-align: center;
-    margin: 10px;
     background: white;
-    cursor: pointer;
+    margin: 10px;
   }
 
   #grid {
     display: grid;
     gap: 6px;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 140px);
     padding: 10px;
+  }
+
+  .imgBox {
+    position: relative;
   }
 
   img {
@@ -33,10 +45,36 @@
     object-fit: cover;
     border-radius: 8px;
   }
+
+  .deleteBtn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    width: 25px;
+    height: 25px;
+  }
+
+  #bgBtn {
+    padding: 8px 12px;
+    cursor: pointer;
+    background: #444;
+    border: none;
+    color: white;
+    border-radius: 5px;
+  }
 </style>
 </head>
 
 <body>
+
+<div id="topBar">
+  <button id="bgBtn">Set Background (Drop Image Here)</button>
+</div>
 
 <div id="dropZone">📂 Drag & Drop Images Here</div>
 <div id="grid"></div>
@@ -44,14 +82,34 @@
 <script>
   const dropZone = document.getElementById('dropZone');
   const grid = document.getElementById('grid');
+  const bgBtn = document.getElementById('bgBtn');
+
   let images = [];
 
+  // DROP IMAGES INTO GRID
   dropZone.addEventListener('dragover', e => e.preventDefault());
 
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
-    const files = e.dataTransfer.files;
+    handleFiles(e.dataTransfer.files);
+  });
 
+  // DROP IMAGE FOR BACKGROUND
+  bgBtn.addEventListener('dragover', e => e.preventDefault());
+
+  bgBtn.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        document.body.style.backgroundImage = `url(${event.target.result})`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  function handleFiles(files) {
     for (let file of files) {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
@@ -62,18 +120,32 @@
         reader.readAsDataURL(file);
       }
     }
-  });
+  }
 
   function renderGrid() {
     grid.innerHTML = '';
 
-    let cols = Math.ceil(Math.sqrt(images.length));
+    let cols = Math.ceil(Math.sqrt(images.length || 1));
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
-    images.forEach(src => {
+    images.forEach((src, index) => {
+      const box = document.createElement('div');
+      box.className = 'imgBox';
+
       const img = document.createElement('img');
       img.src = src;
-      grid.appendChild(img);
+
+      const btn = document.createElement('button');
+      btn.className = 'deleteBtn';
+      btn.innerText = '×';
+      btn.onclick = () => {
+        images.splice(index, 1);
+        renderGrid();
+      };
+
+      box.appendChild(img);
+      box.appendChild(btn);
+      grid.appendChild(box);
     });
   }
 </script>
