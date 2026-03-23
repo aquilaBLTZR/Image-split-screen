@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Framed 2/4 Image Collage</title>
+<title>Framed Collage Centered Scaling</title>
 <style>
 html, body {
   margin: 0;
   height: 100%;
   width: 100%;
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   overflow: hidden;
   background-size: cover;
   background-position: center;
@@ -46,12 +46,14 @@ button, input[type=range] {
 #grid {
   position: relative;
   width: 100vw;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 140px); /* Account for top bar + remove buttons + dropZone */
 }
 
 #grid img.contentImage {
   position: absolute;
   object-fit: cover;
+  transform-origin: center center; /* scale from center */
+  transition: transform 0.2s, left 0.2s, top 0.2s, width 0.2s, height 0.2s;
 }
 
 #grid img.frameImage {
@@ -80,7 +82,7 @@ button, input[type=range] {
 let images = [];
 let collageScale = 1;
 
-// Replace these URLs with hosted versions of your frames
+// Replace these URLs with your hosted frame images
 const frame2URL = "https://example.com/STD_SPLIT_FRAME.png";
 const frame4URL = "https://example.com/STD_MULTIVIEW_FRAME_4.png";
 
@@ -97,7 +99,7 @@ dropZone.addEventListener('drop', e => {
   handleFiles(e.dataTransfer.files);
 });
 
-// Background
+// Background image picker
 bgBtn.addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
@@ -115,7 +117,7 @@ bgBtn.addEventListener('click', () => {
   input.click();
 });
 
-// Handle files
+// Handle uploaded images
 function handleFiles(files) {
   for (let file of files) {
     if (file.type.startsWith('image/') && images.length < 4) {
@@ -129,7 +131,7 @@ function handleFiles(files) {
   }
 }
 
-// Render collage with frame overlay
+// Render collage with centered scaling
 function renderGrid() {
   grid.innerHTML = '';
   const frameURL = images.length === 2 ? frame2URL : frame4URL;
@@ -139,10 +141,17 @@ function renderGrid() {
     const img = document.createElement('img');
     img.src = imgData.src;
     img.className = "contentImage";
-    img.style.left = positions[i].x * collageScale + "px";
-    img.style.top = positions[i].y * collageScale + "px";
-    img.style.width = positions[i].w * collageScale + "px";
-    img.style.height = positions[i].h * collageScale + "px";
+    const pos = positions[i];
+
+    // Set image center position
+    const centerX = pos.x + pos.w / 2;
+    const centerY = pos.y + pos.h / 2;
+    img.style.left = `${centerX}px`;
+    img.style.top = `${centerY}px`;
+    img.style.width = `${pos.w}px`;
+    img.style.height = `${pos.h}px`;
+    img.style.transform = `translate(-50%, -50%) scale(${collageScale})`;
+
     grid.appendChild(img);
   });
 
@@ -168,18 +177,18 @@ function renderGrid() {
   }
 }
 
-// Define exact positions for each frame
+// Define positions for each frame slot
 function getPositions(count) {
   const w = grid.clientWidth;
   const h = grid.clientHeight;
   if (count === 2) {
-    // Split frame positions
+    // 2-image split
     return [
       { x: 0, y: 0, w: w/2, h: h },
       { x: w/2, y: 0, w: w/2, h: h }
     ];
   } else {
-    // 4-image frame positions (2x2)
+    // 4-image 2x2
     return [
       { x: 0, y: 0, w: w/2, h: h/2 },
       { x: w/2, y: 0, w: w/2, h: h/2 },
@@ -189,13 +198,13 @@ function getPositions(count) {
   }
 }
 
-// Universal collage scale
+// Universal collage scale slider
 sizeSlider.addEventListener('input', () => {
   collageScale = sizeSlider.value;
   renderGrid();
 });
 
-// Export exact view
+// Export exact view with frame overlay
 function exportImage() {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -211,12 +220,14 @@ function exportImage() {
     const img = new Image();
     img.src = imgData.src;
     img.onload = () => {
-      ctx.drawImage(img,
-        positions[i].x * collageScale,
-        positions[i].y * collageScale,
-        positions[i].w * collageScale,
-        positions[i].h * collageScale
-      );
+      const pos = positions[i];
+      const centerX = pos.x + pos.w / 2;
+      const centerY = pos.y + pos.h / 2;
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(collageScale, collageScale);
+      ctx.drawImage(img, -pos.w/2, -pos.h/2, pos.w, pos.h);
+      ctx.restore();
     };
   });
 
@@ -231,7 +242,7 @@ function exportImage() {
   };
 }
 
-// Full screen
+// Full screen tab
 function openFullscreen() {
   const newTab = window.open();
   const frameURL = images.length === 2 ? frame2URL : frame4URL;
@@ -242,7 +253,10 @@ function openFullscreen() {
   let html = `<html><body style="margin:0;position:relative;width:${w}px;height:${h}px;">`;
 
   images.forEach((imgData, i) => {
-    html += `<img src="${imgData.src}" style="position:absolute;left:${positions[i].x}px;top:${positions[i].y}px;width:${positions[i].w}px;height:${positions[i].h}px;object-fit:cover;">`;
+    const pos = positions[i];
+    const centerX = pos.x + pos.w / 2;
+    const centerY = pos.y + pos.h / 2;
+    html += `<img src="${imgData.src}" style="position:absolute;left:${centerX}px;top:${centerY}px;width:${pos.w}px;height:${pos.h}px;object-fit:cover;transform:translate(-50%,-50%) scale(${collageScale});">`;
   });
 
   html += `<img src="${frameURL}" style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;pointer-events:none;">`;
@@ -250,7 +264,7 @@ function openFullscreen() {
   newTab.document.write(html);
 }
 
-// Resize handling
+// Handle window resize
 window.addEventListener('resize', renderGrid);
 </script>
 
