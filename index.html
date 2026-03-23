@@ -2,25 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Advanced Image Split App</title>
-
+<title>Responsive 4-Image Collage</title>
 <style>
-body {
+html, body {
   margin: 0;
-  font-family: Arial;
+  height: 100%;
+  font-family: Arial, sans-serif;
   background-size: cover;
   background-position: center;
 }
 
 #topBar {
   display: flex;
+  align-items: center;
   gap: 10px;
   padding: 10px;
   background: #222;
   color: white;
+  flex-wrap: wrap;
 }
 
-button {
+button, input[type=range] {
   cursor: pointer;
 }
 
@@ -32,88 +34,87 @@ button {
   margin: 10px;
 }
 
+#removeButtons {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  flex-wrap: wrap;
+}
+
 #grid {
   display: grid;
-  gap: 6px;
-  height: calc(100vh - 180px);
-  padding: 10px;
+  gap: 4px;
+  width: 100vw;
+  height: calc(100vh - 140px); /* Adjust to remaining screen */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
 }
 
-.imgBox {
-  position: relative;
-}
-
-img {
+#grid img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 8px;
-}
-
-.deleteBtn {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: red;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 25px;
-  height: 25px;
-}
-
-.slider {
-  position: absolute;
-  bottom: 5px;
-  left: 5px;
-  width: 80%;
+  border-radius: 6px;
+  transition: transform 0.2s;
 }
 </style>
 </head>
-
 <body>
 
 <div id="topBar">
   <button id="bgBtn">Set Background</button>
+  <label>Collage Scale:</label>
+  <input type="range" id="sizeSlider" min="0.5" max="2" step="0.1" value="1">
   <button onclick="exportImage()">Export Image</button>
   <button onclick="openFullscreen()">Full Screen</button>
 </div>
 
-<div id="dropZone">📂 Drag & Drop Images Here</div>
+<div id="dropZone">📂 Drag & Drop Images Here (Max 4)</div>
+<div id="removeButtons"></div>
 <div id="grid"></div>
 
 <script>
 let images = [];
+let collageScale = 1;
 
 const dropZone = document.getElementById('dropZone');
 const grid = document.getElementById('grid');
 const bgBtn = document.getElementById('bgBtn');
+const sizeSlider = document.getElementById('sizeSlider');
+const removeButtonsDiv = document.getElementById('removeButtons');
 
-// DRAG IN
+// --- Drag and drop images ---
 dropZone.addEventListener('dragover', e => e.preventDefault());
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   handleFiles(e.dataTransfer.files);
 });
 
-// BACKGROUND
-bgBtn.addEventListener('dragover', e => e.preventDefault());
-bgBtn.addEventListener('drop', e => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.body.style.backgroundImage = `url(${e.target.result})`;
+// --- Background image ---
+bgBtn.addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        document.body.style.backgroundImage = `url(${ev.target.result})`;
+      };
+      reader.readAsDataURL(file);
+    }
   };
-  reader.readAsDataURL(file);
+  input.click();
 });
 
+// --- Handle uploaded images ---
 function handleFiles(files) {
   for (let file of files) {
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/') && images.length < 4) {
       const reader = new FileReader();
       reader.onload = e => {
-        images.push({ src: e.target.result, size: 1 });
+        images.push({ src: e.target.result });
         renderGrid();
       };
       reader.readAsDataURL(file);
@@ -121,85 +122,53 @@ function handleFiles(files) {
   }
 }
 
-// RENDER GRID
+// --- Render the collage ---
 function renderGrid() {
   grid.innerHTML = '';
-
-  let cols = Math.ceil(Math.sqrt(images.length || 1));
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-  images.forEach((imgData, index) => {
-    const box = document.createElement('div');
-    box.className = 'imgBox';
-    box.draggable = true;
-
-    // DRAG REORDER
-    box.ondragstart = () => box.dataset.index = index;
-    box.ondrop = e => {
-      e.preventDefault();
-      let from = e.dataTransfer.getData("text");
-      let to = index;
-      [images[from], images[to]] = [images[to], images[from]];
-      renderGrid();
-    };
-    box.ondragover = e => {
-      e.preventDefault();
-      e.dataTransfer.setData("text", index);
-    };
-
+  images.forEach((imgData) => {
     const img = document.createElement('img');
     img.src = imgData.src;
-    img.style.transform = `scale(${imgData.size})`;
-
-    // DELETE
-    const del = document.createElement('button');
-    del.className = 'deleteBtn';
-    del.innerText = '×';
-    del.onclick = () => {
-      images.splice(index, 1);
-      renderGrid();
-    };
-
-    // RESIZE
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.min = 0.5;
-    slider.max = 2;
-    slider.step = 0.1;
-    slider.value = imgData.size;
-    slider.className = 'slider';
-
-    slider.oninput = () => {
-      images[index].size = slider.value;
-      renderGrid();
-    };
-
-    box.appendChild(img);
-    box.appendChild(del);
-    box.appendChild(slider);
-    grid.appendChild(box);
+    img.style.transform = `scale(${collageScale})`;
+    grid.appendChild(img);
   });
+
+  // --- Remove buttons ---
+  removeButtonsDiv.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const btn = document.createElement('button');
+    btn.innerText = `Remove Image ${i + 1}`;
+    btn.disabled = !images[i];
+    btn.onclick = () => {
+      if (images[i]) {
+        images.splice(i, 1);
+        renderGrid();
+      }
+    };
+    removeButtonsDiv.appendChild(btn);
+  }
 }
 
-// EXPORT IMAGE
+// --- Universal collage scale ---
+sizeSlider.addEventListener('input', () => {
+  collageScale = sizeSlider.value;
+  renderGrid();
+});
+
+// --- Export ---
 function exportImage() {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-
-  let cols = Math.ceil(Math.sqrt(images.length));
-  let size = 300;
-
-  canvas.width = cols * size;
-  canvas.height = cols * size;
+  const size = 300;
+  canvas.width = 2 * size;
+  canvas.height = 2 * size;
 
   images.forEach((imgData, i) => {
-    let img = new Image();
+    const img = new Image();
     img.src = imgData.src;
-
     img.onload = () => {
-      let x = (i % cols) * size;
-      let y = Math.floor(i / cols) * size;
-      ctx.drawImage(img, x, y, size, size);
+      const x = (i % 2) * size;
+      const y = Math.floor(i / 2) * size;
+      ctx.drawImage(img, x, y, size * collageScale, size * collageScale);
     };
   });
 
@@ -211,16 +180,14 @@ function exportImage() {
   }, 500);
 }
 
-// FULL SCREEN TAB
+// --- Full screen tab ---
 function openFullscreen() {
-  let newTab = window.open();
-  let html = `<html><body style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,1fr);">`;
-
+  const newTab = window.open();
+  let html = `<html><body style="margin:0;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);">`;
   images.forEach(img => {
-    html += `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;">`;
+    html += `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;transform:scale(${collageScale})">`;
   });
-
-  html += "</body></html>";
+  html += `</body></html>`;
   newTab.document.write(html);
 }
 </script>
