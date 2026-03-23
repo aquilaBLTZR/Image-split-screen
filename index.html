@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Full Screen 4-Image Collage</title>
+<title>Framed 2/4 Image Collage</title>
 <style>
 html, body {
   margin: 0;
   height: 100%;
   width: 100%;
   font-family: Arial, sans-serif;
-  overflow: hidden; /* Prevent scrolling */
+  overflow: hidden;
   background-size: cover;
   background-position: center;
 }
@@ -22,7 +22,6 @@ html, body {
   background: #222;
   color: white;
   flex-wrap: wrap;
-  box-sizing: border-box;
 }
 
 button, input[type=range] {
@@ -45,20 +44,21 @@ button, input[type=range] {
 }
 
 #grid {
-  display: grid;
-  gap: 2px;
-  /* 2x2 layout fills remaining viewport */
+  position: relative;
   width: 100vw;
-  height: calc(100vh - 120px); /* Account for top bar + remove buttons + dropZone */
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  height: calc(100vh - 140px);
 }
 
-#grid img {
+#grid img.contentImage {
+  position: absolute;
+  object-fit: cover;
+}
+
+#grid img.frameImage {
+  position: absolute;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform 0.2s;
+  pointer-events: none;
 }
 </style>
 </head>
@@ -67,7 +67,7 @@ button, input[type=range] {
 <div id="topBar">
   <button id="bgBtn">Set Background</button>
   <label>Collage Scale:</label>
-  <input type="range" id="sizeSlider" min="0.5" max="2" step="0.1" value="1">
+  <input type="range" id="sizeSlider" min="0.5" max="2" step="0.01" value="1">
   <button onclick="exportImage()">Export Image</button>
   <button onclick="openFullscreen()">Full Screen</button>
 </div>
@@ -79,6 +79,10 @@ button, input[type=range] {
 <script>
 let images = [];
 let collageScale = 1;
+
+// Replace these URLs with hosted versions of your frames
+const frame2URL = "https://example.com/STD_SPLIT_FRAME.png";
+const frame4URL = "https://example.com/STD_MULTIVIEW_FRAME_4.png";
 
 const dropZone = document.getElementById('dropZone');
 const grid = document.getElementById('grid');
@@ -93,7 +97,7 @@ dropZone.addEventListener('drop', e => {
   handleFiles(e.dataTransfer.files);
 });
 
-// Background image picker
+// Background
 bgBtn.addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
@@ -111,7 +115,7 @@ bgBtn.addEventListener('click', () => {
   input.click();
 });
 
-// Handle uploaded images
+// Handle files
 function handleFiles(files) {
   for (let file of files) {
     if (file.type.startsWith('image/') && images.length < 4) {
@@ -125,15 +129,28 @@ function handleFiles(files) {
   }
 }
 
-// Render collage
+// Render collage with frame overlay
 function renderGrid() {
   grid.innerHTML = '';
-  images.forEach((imgData) => {
+  const frameURL = images.length === 2 ? frame2URL : frame4URL;
+  const positions = getPositions(images.length);
+
+  images.forEach((imgData, i) => {
     const img = document.createElement('img');
     img.src = imgData.src;
-    img.style.transform = `scale(${collageScale})`;
+    img.className = "contentImage";
+    img.style.left = positions[i].x * collageScale + "px";
+    img.style.top = positions[i].y * collageScale + "px";
+    img.style.width = positions[i].w * collageScale + "px";
+    img.style.height = positions[i].h * collageScale + "px";
     grid.appendChild(img);
   });
+
+  // Add frame overlay
+  const frame = document.createElement('img');
+  frame.src = frameURL;
+  frame.className = "frameImage";
+  grid.appendChild(frame);
 
   // Remove buttons
   removeButtonsDiv.innerHTML = '';
@@ -151,50 +168,89 @@ function renderGrid() {
   }
 }
 
-// Collage universal scale
+// Define exact positions for each frame
+function getPositions(count) {
+  const w = grid.clientWidth;
+  const h = grid.clientHeight;
+  if (count === 2) {
+    // Split frame positions
+    return [
+      { x: 0, y: 0, w: w/2, h: h },
+      { x: w/2, y: 0, w: w/2, h: h }
+    ];
+  } else {
+    // 4-image frame positions (2x2)
+    return [
+      { x: 0, y: 0, w: w/2, h: h/2 },
+      { x: w/2, y: 0, w: w/2, h: h/2 },
+      { x: 0, y: h/2, w: w/2, h: h/2 },
+      { x: w/2, y: h/2, w: w/2, h: h/2 }
+    ];
+  }
+}
+
+// Universal collage scale
 sizeSlider.addEventListener('input', () => {
   collageScale = sizeSlider.value;
   renderGrid();
 });
 
-// Export collage
+// Export exact view
 function exportImage() {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const size = 300;
-  canvas.width = 2 * size;
-  canvas.height = 2 * size;
+  const w = grid.clientWidth;
+  const h = grid.clientHeight;
+  canvas.width = w;
+  canvas.height = h;
+
+  const frameURL = images.length === 2 ? frame2URL : frame4URL;
+  const positions = getPositions(images.length);
 
   images.forEach((imgData, i) => {
     const img = new Image();
     img.src = imgData.src;
     img.onload = () => {
-      const x = (i % 2) * size;
-      const y = Math.floor(i / 2) * size;
-      ctx.drawImage(img, x, y, size * collageScale, size * collageScale);
+      ctx.drawImage(img,
+        positions[i].x * collageScale,
+        positions[i].y * collageScale,
+        positions[i].w * collageScale,
+        positions[i].h * collageScale
+      );
     };
   });
 
-  setTimeout(() => {
+  const frame = new Image();
+  frame.src = frameURL;
+  frame.onload = () => {
+    ctx.drawImage(frame, 0, 0, w, h);
     const link = document.createElement('a');
     link.download = 'collage.png';
     link.href = canvas.toDataURL();
     link.click();
-  }, 500);
+  };
 }
 
-// Full screen tab
+// Full screen
 function openFullscreen() {
   const newTab = window.open();
-  let html = `<html><body style="margin:0;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);">`;
-  images.forEach(img => {
-    html += `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;transform:scale(${collageScale})">`;
+  const frameURL = images.length === 2 ? frame2URL : frame4URL;
+  const positions = getPositions(images.length);
+  const w = grid.clientWidth;
+  const h = grid.clientHeight;
+
+  let html = `<html><body style="margin:0;position:relative;width:${w}px;height:${h}px;">`;
+
+  images.forEach((imgData, i) => {
+    html += `<img src="${imgData.src}" style="position:absolute;left:${positions[i].x}px;top:${positions[i].y}px;width:${positions[i].w}px;height:${positions[i].h}px;object-fit:cover;">`;
   });
+
+  html += `<img src="${frameURL}" style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;pointer-events:none;">`;
   html += `</body></html>`;
   newTab.document.write(html);
 }
 
-// Make grid resize when window changes
+// Resize handling
 window.addEventListener('resize', renderGrid);
 </script>
 
