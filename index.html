@@ -2,152 +2,227 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Image Split Screen</title>
+<title>Advanced Image Split App</title>
 
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background-size: cover;
-    background-position: center;
-  }
+body {
+  margin: 0;
+  font-family: Arial;
+  background-size: cover;
+  background-position: center;
+}
 
-  #topBar {
-    display: flex;
-    gap: 10px;
-    padding: 10px;
-    background: #222;
-    color: white;
-  }
+#topBar {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: #222;
+  color: white;
+}
 
-  #dropZone {
-    border: 2px dashed #666;
-    padding: 15px;
-    text-align: center;
-    background: white;
-    margin: 10px;
-  }
+button {
+  cursor: pointer;
+}
 
-  #grid {
-    display: grid;
-    gap: 6px;
-    height: calc(100vh - 140px);
-    padding: 10px;
-  }
+#dropZone {
+  border: 2px dashed #666;
+  padding: 15px;
+  text-align: center;
+  background: white;
+  margin: 10px;
+}
 
-  .imgBox {
-    position: relative;
-  }
+#grid {
+  display: grid;
+  gap: 6px;
+  height: calc(100vh - 180px);
+  padding: 10px;
+}
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 8px;
-  }
+.imgBox {
+  position: relative;
+}
 
-  .deleteBtn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: red;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    width: 25px;
-    height: 25px;
-  }
+img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
 
-  #bgBtn {
-    padding: 8px 12px;
-    cursor: pointer;
-    background: #444;
-    border: none;
-    color: white;
-    border-radius: 5px;
-  }
+.deleteBtn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: red;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+}
+
+.slider {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  width: 80%;
+}
 </style>
 </head>
 
 <body>
 
 <div id="topBar">
-  <button id="bgBtn">Set Background (Drop Image Here)</button>
+  <button id="bgBtn">Set Background</button>
+  <button onclick="exportImage()">Export Image</button>
+  <button onclick="openFullscreen()">Full Screen</button>
 </div>
 
 <div id="dropZone">📂 Drag & Drop Images Here</div>
 <div id="grid"></div>
 
 <script>
-  const dropZone = document.getElementById('dropZone');
-  const grid = document.getElementById('grid');
-  const bgBtn = document.getElementById('bgBtn');
+let images = [];
 
-  let images = [];
+const dropZone = document.getElementById('dropZone');
+const grid = document.getElementById('grid');
+const bgBtn = document.getElementById('bgBtn');
 
-  // DROP IMAGES INTO GRID
-  dropZone.addEventListener('dragover', e => e.preventDefault());
+// DRAG IN
+dropZone.addEventListener('dragover', e => e.preventDefault());
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  handleFiles(e.dataTransfer.files);
+});
 
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    handleFiles(e.dataTransfer.files);
-  });
+// BACKGROUND
+bgBtn.addEventListener('dragover', e => e.preventDefault());
+bgBtn.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.body.style.backgroundImage = `url(${e.target.result})`;
+  };
+  reader.readAsDataURL(file);
+});
 
-  // DROP IMAGE FOR BACKGROUND
-  bgBtn.addEventListener('dragover', e => e.preventDefault());
-
-  bgBtn.addEventListener('drop', e => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
+function handleFiles(files) {
+  for (let file of files) {
+    if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        document.body.style.backgroundImage = `url(${event.target.result})`;
+      reader.onload = e => {
+        images.push({ src: e.target.result, size: 1 });
+        renderGrid();
       };
       reader.readAsDataURL(file);
     }
+  }
+}
+
+// RENDER GRID
+function renderGrid() {
+  grid.innerHTML = '';
+
+  let cols = Math.ceil(Math.sqrt(images.length || 1));
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  images.forEach((imgData, index) => {
+    const box = document.createElement('div');
+    box.className = 'imgBox';
+    box.draggable = true;
+
+    // DRAG REORDER
+    box.ondragstart = () => box.dataset.index = index;
+    box.ondrop = e => {
+      e.preventDefault();
+      let from = e.dataTransfer.getData("text");
+      let to = index;
+      [images[from], images[to]] = [images[to], images[from]];
+      renderGrid();
+    };
+    box.ondragover = e => {
+      e.preventDefault();
+      e.dataTransfer.setData("text", index);
+    };
+
+    const img = document.createElement('img');
+    img.src = imgData.src;
+    img.style.transform = `scale(${imgData.size})`;
+
+    // DELETE
+    const del = document.createElement('button');
+    del.className = 'deleteBtn';
+    del.innerText = '×';
+    del.onclick = () => {
+      images.splice(index, 1);
+      renderGrid();
+    };
+
+    // RESIZE
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = 0.5;
+    slider.max = 2;
+    slider.step = 0.1;
+    slider.value = imgData.size;
+    slider.className = 'slider';
+
+    slider.oninput = () => {
+      images[index].size = slider.value;
+      renderGrid();
+    };
+
+    box.appendChild(img);
+    box.appendChild(del);
+    box.appendChild(slider);
+    grid.appendChild(box);
+  });
+}
+
+// EXPORT IMAGE
+function exportImage() {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let cols = Math.ceil(Math.sqrt(images.length));
+  let size = 300;
+
+  canvas.width = cols * size;
+  canvas.height = cols * size;
+
+  images.forEach((imgData, i) => {
+    let img = new Image();
+    img.src = imgData.src;
+
+    img.onload = () => {
+      let x = (i % cols) * size;
+      let y = Math.floor(i / cols) * size;
+      ctx.drawImage(img, x, y, size, size);
+    };
   });
 
-  function handleFiles(files) {
-    for (let file of files) {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          images.push(event.target.result);
-          renderGrid();
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  }
+  setTimeout(() => {
+    const link = document.createElement('a');
+    link.download = 'collage.png';
+    link.href = canvas.toDataURL();
+    link.click();
+  }, 500);
+}
 
-  function renderGrid() {
-    grid.innerHTML = '';
+// FULL SCREEN TAB
+function openFullscreen() {
+  let newTab = window.open();
+  let html = `<html><body style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,1fr);">`;
 
-    let cols = Math.ceil(Math.sqrt(images.length || 1));
-    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  images.forEach(img => {
+    html += `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;">`;
+  });
 
-    images.forEach((src, index) => {
-      const box = document.createElement('div');
-      box.className = 'imgBox';
-
-      const img = document.createElement('img');
-      img.src = src;
-
-      const btn = document.createElement('button');
-      btn.className = 'deleteBtn';
-      btn.innerText = '×';
-      btn.onclick = () => {
-        images.splice(index, 1);
-        renderGrid();
-      };
-
-      box.appendChild(img);
-      box.appendChild(btn);
-      grid.appendChild(box);
-    });
-  }
+  html += "</body></html>";
+  newTab.document.write(html);
+}
 </script>
 
 </body>
